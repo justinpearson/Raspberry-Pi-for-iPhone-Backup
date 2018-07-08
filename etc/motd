@@ -1,0 +1,24 @@
+===================================
+------------ HEY BUDDY ------------
+
+The RPi's time is not set right because I don't let it on the WAN.
+
+I added the command `service udev restart` to `/etc/rc.local` so that
+it runs after every change in runlevel, because I wanted it to run at
+reboot to avoid having to restart it myself upon bootup.
+
+Here was my previous solution (restart udev on reboot):
+
+After reboot, you have to `sudo service udev restart` or the udev
+script `/etc/udev/rules.d/lol.rules` will fail when you plug your
+phone in, logging the error
+
+    Jul 07 12:34:53 rpi01 systemd-udevd[1078]: Process '/bin/bash
+    /home/pi/udev-runs-this.sh' failed with exit code 1.
+
+to `journalctl -f` .
+
+
+--------- HAVE A NICE DAY ----------
+====================================
+

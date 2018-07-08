@@ -1,0 +1,2 @@
+# run a short little program when iphone plugged in
+SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ENV{PRODUCT}=="5ac/12[9a][0-9a-f]/*", ACTION=="add", ENV{SYSTEMD_WANTS}="usbmuxd.service", RUN+="/bin/bash /home/pi/udev-runs-this.sh"
