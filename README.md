@@ -4,6 +4,8 @@ You can use a Raspberry Pi (even a tiny RPi Zero) to backup your iphone. You plu
 
 (Note: Consider having your router disallow the RPi on the WAN, since you're just using it for iphone backup.)
 
+<img src="Images/rpi-iphone-trust.jpg">
+
 ## Table of Contents
 
 - [Introduction](#introduction)
