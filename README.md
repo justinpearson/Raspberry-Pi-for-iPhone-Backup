@@ -2,7 +2,29 @@
 
 You can use a Raspberry Pi (even a tiny RPi Zero) to backup your iphone. You plug the phone into the RPi at night, and the RPi charges it and copies its photos, music, etc onto the RPi's micro-SD card. 
 
-(Consider having your router disallow the RPi on the WAN, since you're just using it for iphone backup.)
+(Note: Consider having your router disallow the RPi on the WAN, since you're just using it for iphone backup.)
+
+## Table of Contents
+
+- [Introduction](#introduction)
+    - [Troubleshooting tip](#troubleshooting-tip)
+- [1. Install `libimobiledevice` from source](#1-install-libimobiledevice-from-source)
+- [2. Plug, pair, and mount iPhone](#2-plug-pair-and-mount-iphone)
+    - [2a. Plug in phone](#2a-plug-in-phone)
+    - [2b. Pair phone to RPi](#2b-pair-phone-to-rpi)
+    - [2c. Mount phone's files on RPi](#2c-mount-phones-files-on-rpi)
+    - [2d. Back up phone to RPi](#2d-back-up-phone-to-rpi)
+    - [2e. Unmount, Unpair, Unplug](#2e-unmount-unpair-unplug)
+- [3. Run the backup script](#3-run-the-backup-script)
+- [4. Configure udev to run the backup script upon the phone plug-in event](#4-configure-udev-to-run-the-backup-script-upon-the-phone-plug-in-event)
+    - [4a. udev example](#4a-udev-example)
+    - [4b. Set up our own udev rule to run backup script upon plug-in](#4b-set-up-our-own-udev-rule-to-run-backup-script-upon-plug-in)
+- [5. Ensuring `udev` is configured correctly at boot](#5-ensuring-udev-is-configured-correctly-at-boot)
+- [Appendix: Troubleshooting](#appendix-troubleshooting)
+- [Appendix: Notes / Resources](#appendix-notes-and-resources)
+
+
+# Introduction
 
 Accessing an iPhone's data from a Raspberry Pi is harder than you'd expect. The Raspbian OS doesn't seem to support it by default: the `apt-get install` versions of the iPhone-mounting software `libimobiledevice6` and `ifuse` did not work for my phone running iOS 11.4. So I followed [samrocketman's instructions](https://gist.github.com/samrocketman/70dff6ebb18004fc37dc5e33c259a0fc) for installing `libimobiledevice` and `ifuse` from source. Here are his instructions with my additions.
 
@@ -29,7 +51,7 @@ If everything is set up correctly, the `backup-iphone.sh` script will start to r
 
 
 
-## Troubleshooting Tip
+## Troubleshooting tip
 
 To help debug problems, it's useful to keep an eye on several utilities:
 
@@ -41,7 +63,7 @@ To help debug problems, it's useful to keep an eye on several utilities:
 - `watch -d -t /home/pi/usr/bin/idevicepair list` tells you when the phone is paired
 - `tail -f /home/pi/log.txt` shows the log that the `/home/pi/backup-iphone.sh` script writes to
 
-<img src="Images/rpi-iphone-diagnostics.png" width=300>
+<img src="Images/rpi-iphone-diagnostics.png" width=600>
 
 Here is a bash snippet for Mac that runs each of these commands in its own terminal window on the RPi over ssh.
 
@@ -90,8 +112,9 @@ Remove packages that we're going to build from source:
 
 Verify you still have the `usbmux` user.
 
-
 **REBOOT**
+
+Now we are ready to install `libimobiledevice` and friends from source.
 
 Add to your `.bashrc` some config that lets us build code in `~/usr` :
 
@@ -176,6 +199,8 @@ Tips:
 
 ## 2a. Plug in phone
 
+Plug the iPhone into the RPi's USB port. (Note the RPi Zero has micro-USB ports for both power and data; plug the phone into the data port.)
+
 Running `dmesg` shows the USB driver at least recognizes it:
 
     (python3) pi@rpi01:~ $ dmesg -wH
@@ -194,12 +219,12 @@ Unlock the phone and wait 10-20 secs for the phone to ask you to Trust the compu
 
 ## 2b. Pair phone to RPi
 
-    (python3) pi@rpi01:~ $ idevicepair --debug pair
+    (python3) pi@rpi01:~ $ idevicepair pair
     SUCCESS: Paired with device XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
 ## 2c. Mount phone's files on RPi
 
-We'll mount the iphone here:
+We'll mount the iphone at `~/usr/mnt`.
 
     mkdir -p ~/usr/mnt
     ifuse ~/usr/mnt
@@ -224,16 +249,16 @@ Now the iPhone's files are mounted:
 
 
 
-# 3. The backup script
+# 3. Run the backup script
 
-The file `backup-iphone.sh` contains a script that detects the phone with `lsusb`, pairs the phone to the RPi with `idevicepair pair`, mounts it with `ifuse`, and copies everything (or, everything that `libimobiledevice` makes availble) to the RPi's micro-SD card with `rsync`. 
-
-Run `/home/pi/backup-iphone.sh` and watch logfile with `tail -f /home/pi/log.txt`. 
+The file `/home/pi/backup-iphone.sh` contains a script that detects the phone with `lsusb`, pairs the phone to the RPi with `idevicepair pair`, mounts it with `ifuse` to `/home/pi/usr/mnt/`, and copies everything (or, everything that `libimobiledevice` makes availble) to the RPi's micro-SD card at `/home/pi/iphone-backups/` with `rsync`. 
 
 (Verify `backup-iphone.sh` is executable.)
 
+Run `/home/pi/backup-iphone.sh` and watch its logfile with `tail -f /home/pi/log.txt`. 
 
-# 4. Configure udev to run script when phone is plugged in
+
+# 4. Configure udev to run the backup script upon the phone plug-in event
 
 Now we configure the RPi to run the `backup-iphone.sh` script whenever the phone plugs into the RPi.
 
@@ -242,7 +267,7 @@ Raspbian Linux currently (July 2018) uses the `udev` system (a part of the `syst
 
 ## 4a. udev example
 
-When you plug in the phone, the `udev` system runs all its "rule" files in `/lib/udev/rules.d` (for system rules) and `/etc/udev/rules.d` (for user-supplied rules) and finds
+When you plug in the phone, the `udev` system runs all its "rule" files in `/lib/udev/rules.d` (for system rules) and `/etc/udev/rules.d` (for user-supplied rules) and finds the file
 
     /lib/udev/rules.d/39-usbmuxd.rules
 
@@ -250,7 +275,7 @@ which contains the line
 
     SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ENV{PRODUCT}=="5ac/12[9a][0-9a-f]/*", ACTION=="add", ENV{USBMUX_SUPPORTED}="1", ATTR{bConfigurationValue}="0", OWNER="usbmux", ENV{SYSTEMD_WANTS}="usbmuxd.service"
 
-which specifes that when the iPhone's product number is added, `systemd` should execute 
+which specifes that when the iPhone's product number is added (`lsusb` shows the phone's `vendorId:productId` as `05ac:12a8`), `systemd` should execute the file
 
     /lib/systemd/system/usbmuxd.service
 
@@ -312,23 +337,6 @@ to
     /etc/rc.local
 
 which causes `systemd` to restart `udev` after every change in runlevel. This is probably overkill, but it ensures `udev` is running correctly after a reboot. The alternative is sshing in and running `sudo service udev restart` after a reboot manually -- ugh.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -435,7 +443,7 @@ Problem: iphone buzzes twice and appears to not be charging. It's like it tries 
 Solution: from `sudo service usbmuxd status`, it said it couldn't find a usbmux user. I apt-get installed usbmuxd to force the creation of the user, then apt-get removed it and built it again from source.
 
 
-## udev config
+## test that udev would run `udev-runs-this.sh`
 
 Check that udev will run the `udev-runs-this.sh` script:
 
@@ -463,7 +471,17 @@ Seems like lots clients connecting to usbmuxd. Can't tell which one is pairing w
 
 
 
-# Appendix: Notes / Resources
+# Appendix: Notes and Resources
+
+
+- https://hackaday.com/2009/09/18/how-to-write-udev-rules/
+- https://askubuntu.com/questions/581810/iphone-does-not-unmount-properly-when-unplugged
+- https://github.com/libimobiledevice/usbmuxd/issues/26
+- https://raspberrypi.stackexchange.com/questions/19600/is-there-a-way-to-automatically-activate-a-script-when-a-usb-device-connects
+- https://unix.stackexchange.com/questions/28548/how-to-run-custom-scripts-upon-usb-device-plug-in
+
+
+
 
 
 <https://github.com/libimobiledevice/usbmuxd/issues/60>
@@ -635,15 +653,7 @@ use `at now` because udev scripts are supposed to exit quickly; udev may kill th
 
 **Todo**
 
-- Automatically backup when the phone is initially plugged into the RPi. Some ideas:
-    - Cronjob that runs every minute looking for the phone? And doesn't step on itself if it's already backing up.
-    - Use `udev` rules to auto-run the iphone-backup script.
-        - https://hackaday.com/2009/09/18/how-to-write-udev-rules/
-        - https://askubuntu.com/questions/581810/iphone-does-not-unmount-properly-when-unplugged
-        - https://github.com/libimobiledevice/usbmuxd/issues/26
-        - https://raspberrypi.stackexchange.com/questions/19600/is-there-a-way-to-automatically-activate-a-script-when-a-usb-device-connects
-        - https://unix.stackexchange.com/questions/28548/how-to-run-custom-scripts-upon-usb-device-plug-in
-    - Light up LEDs to show me the status or errors during backup.
-        - https://www.raspberrypi.org/forums/viewtopic.php?t=127336
-        - https://www.jeffgeerling.com/blogs/jeff-geerling/controlling-pwr-act-leds-raspberry-pi
+- Light up LEDs to show me the status or errors during backup.
+    - https://www.raspberrypi.org/forums/viewtopic.php?t=127336
+    - https://www.jeffgeerling.com/blogs/jeff-geerling/controlling-pwr-act-leds-raspberry-pi
 
