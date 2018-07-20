@@ -6,6 +6,11 @@ You can use a Raspberry Pi (even a tiny RPi Zero) to backup your iphone. You plu
 
 <img src="Images/rpi-iphone-trust.jpg">
 
+You can show backup progress with a [Blinkt LED strip](https://www.adafruit.com/product/3195):
+
+<img src="Images/iphone-rpi-backup-blinkt-crop.png" width=270>
+
+
 ## Table of Contents
 
 - [Introduction](#introduction)
@@ -22,6 +27,7 @@ You can use a Raspberry Pi (even a tiny RPi Zero) to backup your iphone. You plu
     - [4a. udev example](#4a-udev-example)
     - [4b. Set up our own udev rule to run backup script upon plug-in](#4b-set-up-our-own-udev-rule-to-run-backup-script-upon-plug-in)
 - [5. Ensuring `udev` is configured correctly at boot](#5-ensuring-udev-is-configured-correctly-at-boot)
+- [6. Indicate progress with Blinkt LEDs](#6-indicate-progress-with-blinkt-leds)
 - [Appendix: Troubleshooting](#appendix-troubleshooting)
 - [Appendix: Notes / Resources](#appendix-notes-and-resources)
 
@@ -342,7 +348,24 @@ which causes `systemd` to restart `udev` after every change in runlevel. This is
 
 
 
+# 6. Indicate progress with Blinkt LEDs
 
+<img src="Images/iphone-rpi-backup-blinkt-crop.png" width=270>
+
+Buy LED strip from Adafruit: <https://www.adafruit.com/product/3195>
+
+Install Blinkt: run `home/pi/blinkt.sh` from this repo, or download it yourself:
+
+    curl https://get.pimoroni.com/blinkt | bash
+
+Test: Set 0th LED to white (RGB=255,255,255), brightness=.1 (0 to 1)
+
+    python2 -c 'from blinkt import set_pixel, show, clear ; import time ; set_pixel(0,255,255,255,.1) ; show() ; time.sleep(2) ; clear()'
+
+Note: Brightness has only 32 possible values, so setting brightness to anything below `1/32 = 0.03125` rounds it to 0 and turns it off.
+
+<https://github.com/pimoroni/blinkt>
+<http://docs.pimoroni.com/blinkt/>
 
 
 # Appendix: Troubleshooting
