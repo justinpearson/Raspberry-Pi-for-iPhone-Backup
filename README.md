@@ -15,6 +15,7 @@ You can show backup progress with a [Blinkt LED strip](https://www.adafruit.com/
 
 - [Introduction](#introduction)
     - [Troubleshooting tip](#troubleshooting-tip)
+- [0. Install files from this repo](#0-install-files-from-this-repo)
 - [1. Install `libimobiledevice` from source](#1-install-libimobiledevice-from-source)
 - [2. Plug, pair, and mount iPhone](#2-plug-pair-and-mount-iphone)
     - [2a. Plug in phone](#2a-plug-in-phone)
@@ -49,14 +50,14 @@ So, each time you plug in the iPhone to the RPi, you should:
 
 1. unlock the phone,
 2. wait for the "Trust this computer?" dialog to appear on the phone (sometimes takes 20 seconds to appear),
-3. click "Trust". 
+3. click "Trust" and enter passcode.
+4. Keep the screen unlocked for 15 seconds.
 
 After you click "Trust", it is okay for the phone to re-lock and turn off its display.
 
 For some reason the phone doesn't remember the RPi, so you must do this each time. 
 
 If everything is set up correctly, the `backup-iphone.sh` script will start to run as soon as you plug in the phone. It tries to pair for about 2 minutes before it gives up, so you've got 2 minutes to remember to unlock the phone and click "Trust". 
-
 
 
 ## Troubleshooting tip
@@ -90,6 +91,24 @@ The snippet assumes your `~/.ssh/config` file defines the alias `rpi01` to let y
     {
         osascript -e "tell application \"Terminal\" to do script \"ssh -t rpi01 $cmd\""
     }
+
+
+# 0. Install files from this repo
+
+    sudo ln -s /home/pi/Raspberry-Pi-for-iPhone-Backup/etc/udev/rules.d/lol.rules /etc/udev/rules.d/lol.rules
+    ln -s /home/pi/Raspberry-Pi-for-iPhone-Backup/home/pi/udev-runs-this.sh /home/pi/udev-runs-this.sh
+    ln -s /home/pi/Raspberry-Pi-for-iPhone-Backup/home/pi/backup-iphone.sh  /home/pi/backup-iphone.sh
+    ln -s /home/pi/Raspberry-Pi-for-iPhone-Backup/home/pi/leds.pickle /home/pi/leds.pickle
+    ln -s /home/pi/Raspberry-Pi-for-iPhone-Backup/home/pi/leds_OFF.pickle /home/pi/leds_OFF.pickle 
+    
+
+- `lol.rules` tells `udev` to run `udev-runs-this.sh` when the iPhone is plugged in
+- `udev.runs.this.sh` runs `backup-iphone.sh`
+- `backup-iphone.sh` uses `idevicepair`, `ifuse`, and `rsync` to pair with, mount, and backup the iPhone.
+
+In the next section, we build `idevicepair` and friends from source.
+
+
 
 
 # 1. Install `libimobiledevice` from source
