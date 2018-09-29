@@ -1,4 +1,4 @@
-# Raspberry Pi for for iPhone backup
+# Raspberry Pi for iPhone backup
 
 You can use a Raspberry Pi (even a tiny RPi Zero) to backup your iphone. You plug the phone into the RPi at night, and the RPi charges it and copies its photos, music, etc onto the RPi's micro-SD card. 
 
