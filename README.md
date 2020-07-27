@@ -1,6 +1,6 @@
 # Raspberry Pi for iPhone backup
 
-You can use a Raspberry Pi (even a tiny RPi Zero) to backup your iphone. You plug the phone into the RPi at night, and the RPi charges it and copies its photos, music, etc onto the RPi's micro-SD card. 
+You can use a Raspberry Pi (even a tiny RPi Zero) to backup your iphone. You plug the phone into the RPi at night, and the RPi charges it and copies its photos, music, etc onto the RPi's micro-SD card.
 
 (Note: Consider having your router disallow the RPi on the WAN, since you're just using it for iphone backup.)
 
@@ -41,10 +41,10 @@ Also, I wanted the RPi to download the iPhone's data as soon as I plugged it in.
 
 Lastly, there is one lingering problem I haven't solved:
 
-In order to pair the phone to the RPi, the `backup-iphone.sh` script (from this repo) uses the command `$ idevicepair pair`. It seems that for this command to succeed, it requires two things:
-    
+In order to pair the phone to the RPi, the `backup-iphone.py` script (from this repo) uses the command `$ idevicepair pair`. It seems that for this command to succeed, it requires two things:
+
 1. the phone must be unlocked
-2. the phone must "Trust" the RPi 
+2. the phone must "Trust" the RPi
 
 So, each time you plug in the iPhone to the RPi, you should:
 
@@ -55,14 +55,16 @@ So, each time you plug in the iPhone to the RPi, you should:
 
 After you click "Trust", it is okay for the phone to re-lock and turn off its display.
 
-For some reason the phone doesn't remember the RPi, so you must do this each time. 
+For some reason the phone doesn't remember the RPi, so you must do this each time.
 
-If everything is set up correctly, the `backup-iphone.sh` script will start to run as soon as you plug in the phone. It tries to pair for about 2 minutes before it gives up, so you've got 2 minutes to remember to unlock the phone and click "Trust". 
+If everything is set up correctly, the `backup-iphone.py` script will start to run as soon as you plug in the phone. It tries to pair for about 30 seconds before it gives up, so you've got 30 seconds to remember to unlock the phone and click "Trust".
 
 
 ## Troubleshooting tip
 
-To help debug problems, it's useful to keep an eye on several utilities:
+To help debug problems, try running `monitor.sh` on a Mac that can ssh into the Pi. It opens several terminal windows on the Mac that monitor various aspects of the USB-device manager and whether the phone is plugged in and paired.
+
+(The script `monitor.sh` assumes your `~/.ssh/config` file defines an ssh alias `rpi42` for sshing into the Pi.)
 
 - `watch -d -t lsusb` tells you when the phone is plugged in
 - `dmesg -w` gives you kernel messages
@@ -74,7 +76,7 @@ To help debug problems, it's useful to keep an eye on several utilities:
 
 <img src="Images/rpi-iphone-diagnostics.png" width=600>
 
-Here is a bash snippet for Mac that runs each of these commands in its own terminal window on the RPi over ssh.
+If `monitor.sh` doesn't work for you, consider using this bash snippet (for Mac). It runs each of these commands in its own terminal window on the RPi over ssh.
 
 The snippet assumes your `~/.ssh/config` file defines the alias `rpi01` to let you ssh into the RPi.
 
@@ -98,13 +100,15 @@ The snippet assumes your `~/.ssh/config` file defines the alias `rpi01` to let y
     sudo ln -s /home/pi/Raspberry-Pi-for-iPhone-Backup/etc/udev/rules.d/lol.rules /etc/udev/rules.d/lol.rules
     ln -s /home/pi/Raspberry-Pi-for-iPhone-Backup/home/pi/udev-runs-this.sh /home/pi/udev-runs-this.sh
     ln -s /home/pi/Raspberry-Pi-for-iPhone-Backup/home/pi/backup-iphone.sh  /home/pi/backup-iphone.sh
+    ln -s /home/pi/Raspberry-Pi-for-iPhone-Backup/home/pi/backup-iphone.py  /home/pi/backup-iphone.py
     ln -s /home/pi/Raspberry-Pi-for-iPhone-Backup/home/pi/leds.pickle /home/pi/leds.pickle
-    ln -s /home/pi/Raspberry-Pi-for-iPhone-Backup/home/pi/leds_OFF.pickle /home/pi/leds_OFF.pickle 
-    
+    ln -s /home/pi/Raspberry-Pi-for-iPhone-Backup/home/pi/leds_OFF.pickle /home/pi/leds_OFF.pickle
+
 
 - `lol.rules` tells `udev` to run `udev-runs-this.sh` when the iPhone is plugged in
 - `udev.runs.this.sh` runs `backup-iphone.sh`
-- `backup-iphone.sh` uses `idevicepair`, `ifuse`, and `rsync` to pair with, mount, and backup the iPhone.
+- `backup-iphone.sh` sets up some environment variables and calls the main script `backup-iphone.py`.
+- `backup-iphone.py` uses `idevicepair`, `ifuse`, and `rsync` to pair with, mount, and backup the iPhone.
 
 In the next section, we build `idevicepair` and friends from source.
 
@@ -113,9 +117,9 @@ In the next section, we build `idevicepair` and friends from source.
 
 # 1. Install `libimobiledevice` from source
 
-In this section we `git clone` the `libimobiledevice` software and friends. 
+In this section we `git clone` the `libimobiledevice` software and friends.
 
-However, before we do that, we do a little hack to install a user named `usbmux` that is required by a subsystem within `libimobiledevice`. 
+However, before we do that, we do a little hack to install a user named `usbmux` that is required by a subsystem within `libimobiledevice`.
 
 The `usbmuxd` daemon is part of `libimobiledevice`; it multiplexes connections over USB to an iOS device. For safety, it runs as a user named `usbmux` with certain (limited?) permissions. It expects the `usbmux` user to exist or it will fail to start. Unfortunately, when you build `usbmuxd` from source, it doesn't create the `usbmux` user. However, `apt-get install`ing the `usbmuxd` package *does* create the `usbmux` user, and `apt-get remove`ing  `usbmuxd` removes the package but doesn't delete the `usbmux` user. (However, we can't simply use `apt-get`'s version of `usbmux` because the Raspbian repos have old versions of `usbmuxd` and `libimobiledevice` that won't work with iOS 11). So before we build `usbmux` from source, we use `apt-get install` then `apt-get remove` to create the `usbmux` user.
 
@@ -155,7 +159,7 @@ Add to your `.bashrc` some config that lets us build code in `~/usr` :
     export PATH="${HOME}/usr/bin:${PATH}"
     export LD_LIBRARY_PATH="${HOME}/usr/lib:${LD_LIBRARY_PATH}"
 
-Don't forget to 
+Don't forget to
 
     source ~/.bashrc
 
@@ -171,10 +175,13 @@ Get source:
 
     mkdir -p ~/usr/src
     cd ~/usr/src
-    for x in libusbmuxd usbmuxd libimobiledevice ifuse; do git clone https://github.com/libimobiledevice/${x}.git;done
+    for x in libplist libusbmuxd usbmuxd libimobiledevice ifuse; do git clone https://github.com/libimobiledevice/${x}.git;done
 
 Build sources (order matters):
 
+    cd ~/usr/src/libplist
+    ./autogen.sh --prefix="$HOME/usr"
+    make && make install
     cd ~/usr/src/libusbmuxd
     ./autogen.sh --prefix="$HOME/usr"
     make && make install
@@ -186,16 +193,16 @@ Build sources (order matters):
     make && sudo make install
 
 Can't paste subsequent lines with the first block because it'll give subsequent lines as pw attempts to `sudo`.
-    
+
     cd ~/usr/src/ifuse
     ./autogen.sh --prefix="$HOME/usr"
     make && make install
 
 Verify `ifuse` and `idevicepair` resolve to your new versions in `~/usr/bin/`:
-    
+
     type -P ifuse         # should be /home/pi/usr/bin/ifuse
     type -P idevicepair   # should be /home/pi/usr/bin/idevicepair
-    
+
 
 **REBOOT**
 
@@ -257,7 +264,7 @@ We'll mount the iphone at `~/usr/mnt`.
     ifuse ~/usr/mnt
 
 Now the iPhone's files are mounted:
-    
+
     (python3) pi@rpi01:~ $ ls ~/usr/mnt
     AirFair  CloudAssets  Downloads       LoFiCloudAssets  PhotoData  Podcasts       Purchases  Recordings  Vibrations
     Books    DCIM         iTunes_Control  MediaAnalysis    Photos     PublicStaging  Radio      Safari
@@ -278,11 +285,11 @@ Now the iPhone's files are mounted:
 
 # 3. Run the backup script
 
-The file `/home/pi/backup-iphone.sh` contains a script that detects the phone with `lsusb`, pairs the phone to the RPi with `idevicepair pair`, mounts it with `ifuse` to `/home/pi/usr/mnt/`, and copies everything (or, everything that `libimobiledevice` makes availble) to the RPi's micro-SD card at `/home/pi/iphone-backups/` with `rsync`. 
+The file `/home/pi/backup-iphone.py` contains a Python3 script that detects the phone with `lsusb`, pairs the phone to the RPi with `idevicepair pair`, mounts it with `ifuse` to `/home/pi/usr/mnt/`, and copies everything (or, everything that `libimobiledevice` makes availble) to the RPi's micro-SD card at `/home/pi/iphone-backups/` with `rsync`.
 
-(Verify `backup-iphone.sh` is executable.)
+(Verify `backup-iphone.py` is executable.)
 
-Run `/home/pi/backup-iphone.sh` and watch its logfile with `tail -f /home/pi/log.txt`. 
+Run `/home/pi/backup-iphone.sh`, which calls the Python script `backup-iphone.py`, and watch its logfile with `tail -f /home/pi/log.txt`.
 
 
 # 4. Configure udev to run the backup script upon the phone plug-in event
@@ -308,7 +315,7 @@ which specifes that when the iPhone's product number is added (`lsusb` shows the
 
 which contains the line
 
-    ExecStart=/home/pi/usr/sbin/usbmuxd --user usbmux --systemd 
+    ExecStart=/home/pi/usr/sbin/usbmuxd --user usbmux --systemd
 
 which is the command to run the `usbmuxd` daemon. Wow!
 
@@ -319,7 +326,7 @@ Make a new `udev` rules file
 
     /etc/udev/rules.d/lol.rules
 
-that contains    
+that contains
 
     SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ENV{PRODUCT}=="5ac/12[9a][0-9a-f]/*", ACTION=="add", RUN+="/bin/bash /home/pi/udev-runs-this.sh"
 
@@ -334,7 +341,7 @@ Now, when the phone is plugged in, `udev` runs `/home/pi/udev-runs-this.sh`, whi
 
     echo "/bin/su -c '/home/pi/backup-iphone.sh >> /home/pi/log.txt 2>&1' pi" | at now
 
-which runs the `backup-iphone.sh` script as the `pi` user. 
+which runs the `backup-iphone.sh` script as the `pi` user.
 
 
 Notes:
@@ -355,11 +362,11 @@ There is some problem with `usbmuxd` and `udev` not initializing after a reboot:
 
     Jul 07 12:34:53 rpi01 systemd-udevd[1078]: Process '/bin/bash /home/pi/udev-runs-this.sh' failed with exit code 1.
 
-To get around this, add the line 
+To get around this, add the line
 
     service udev restart
 
-to 
+to
 
     /etc/rc.local
 
@@ -389,12 +396,42 @@ Note: Brightness has only 32 possible values, so setting brightness to anything 
 
 # Appendix: Troubleshooting
 
+## Build error "No package 'libusbmuxd-2.0' found" (or libplist) when building idevicepair
+
+Running
+
+    pi@rpi42:~/usr/src/libusbmuxd $ ./autogen.sh
+
+produces error:
+
+    configure: error: Package requirements (libusbmuxd-2.0 >= 2.0.2) were not met:
+
+    No package 'libusbmuxd-2.0' found
+
+    Consider adjusting the PKG_CONFIG_PATH environment variable if you
+    installed software in a non-standard prefix.
+
+
+This doesn't fix it:
+
+    PKG_CONFIG_PATH=/home/pi/usr/lib/pkgconfig:/usr/lib/arm-linux-gnueabihf/pkgconfig: ./autogen.sh --prefix="$HOME/usr"
+
+This fixes it (was missing `libplist`!)
+
+    for x in libplist libusbmuxd usbmuxd libimobiledevice ifuse; do git clone https://github.com/libimobiledevice/${x}.git;done
+
+Then later, build `libplist`:
+
+    cd ~/usr/src/libplist
+    ./autogen.sh --prefix="$HOME/usr"
+    make && make install
+
 
 ## usbmuxd should've installed these
 
 The `.rules` file that `udev` runs upon iphone plug-in:
 
-    (python3) pi@rpi01:~ $ cat /lib/udev/rules.d/39-usbmuxd.rules  
+    (python3) pi@rpi01:~ $ cat /lib/udev/rules.d/39-usbmuxd.rules
     # usbmuxd (Apple Mobile Device Muxer listening on /var/run/usbmuxd)
 
     # systemd should receive all events relating to device
@@ -411,7 +448,7 @@ The `.rules` file that `udev` runs upon iphone plug-in:
 
 Note the line `ENV{SYSTEMD_WANTS}="usbmuxd.service"`, which tells `systemd` to run:
 
-    (python3) pi@rpi01:~ $ cat /lib/systemd/system/usbmuxd.service 
+    (python3) pi@rpi01:~ $ cat /lib/systemd/system/usbmuxd.service
     [Unit]
     Description=Socket daemon for the usbmux protocol used by Apple devices
     Documentation=man:usbmuxd(8)
@@ -426,12 +463,12 @@ Note the line `ENV{SYSTEMD_WANTS}="usbmuxd.service"`, which tells `systemd` to r
 
 <https://github.com/libimobiledevice/usbmuxd/issues/26>
 
-    sudo /usr/local/sbin/usbmuxd -u -U usbmux -vvv -f 
+    sudo /usr/local/sbin/usbmuxd -u -U usbmux -vvv -f
 
 Or: add `-vvv` to the `systemd` service that runs `usbmuxd`:
 
 
-    (python3) pi@rpi01:~ $ cat /lib/systemd/system/usbmuxd.service 
+    (python3) pi@rpi01:~ $ cat /lib/systemd/system/usbmuxd.service
     [Unit]
     Description=Socket daemon for the usbmux protocol used by Apple devices
     Documentation=man:usbmuxd(8)
@@ -460,16 +497,16 @@ The `LD_LIBRARY_PATH` environment variable should include `/home/pi/usr/lib/`. I
 
     export LD_LIBRARY_PATH=/home/pi/usr/lib
 
-in `backup-iphone.sh`. 
+in `backup-iphone.sh`.
 
 
-## "idevicepair: command not found" error    
+## "idevicepair: command not found" error
 
-Probably `/home/pi/usr/bin` is not in the `PATH`. I fixed this by putting 
+Probably `/home/pi/usr/bin` is not in the `PATH`. I fixed this by putting
 
     export PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin:/home/pi/usr/bin
 
-in `backup-iphone.sh`. 
+in `backup-iphone.sh`.
 
 I suspect the problem occurred because my `udev-runs-this.sh` wasn't using `su pi` to run the script. Also I think there's an option to `su` to run the cmd from a login shell, which should execute `pi`'s `.bashrc` file, which we defined the env vars in earlier.
 
@@ -554,7 +591,7 @@ You'll need 5 (five) files for such a USB device as follows, simply filling in r
 
     /etc/udev/rules.d/00-usb-<yourdevice>.rules
 
-    ACTION=="add", ATTRS{idVendor}=="<yourvendorid>", ATTRS{idProduct}=="<yourproductid>", ENV{XAUTHORITY}="/home/<user>/.Xauthority", ENV{DISPLAY}=":0", OWNER="<user>", RUN+="/usr/local/bin/usb-<yourdevice>-in_udev"    
+    ACTION=="add", ATTRS{idVendor}=="<yourvendorid>", ATTRS{idProduct}=="<yourproductid>", ENV{XAUTHORITY}="/home/<user>/.Xauthority", ENV{DISPLAY}=":0", OWNER="<user>", RUN+="/usr/local/bin/usb-<yourdevice>-in_udev"
     ACTION=="remove", ATTRS{idVendor}=="<yourvendorid>", ATTRS{idProduct}=="<yourproductid>", ENV{XAUTHORITY}="/home/<user>/.Xauthority", ENV{DISPLAY}=":0", OWNER="<user>", RUN+="/usr/local/bin/usb-<yourdevice>-out_udev"
 
 (... 4 other files)
@@ -600,7 +637,7 @@ Use case: I have a crypted partition which I want to backup automatically. After
 
 Resource: Scripting with udev
 
-Note: You can find your device unit with: 
+Note: You can find your device unit with:
 
     sudo systemctl list-units -t mount
 
@@ -608,7 +645,7 @@ Note: You can find your device unit with:
 
 <https://github.com/libimobiledevice/usbmuxd/blob/master/udev/39-usbmuxd.rules.in>
 
-These udev rules seem to have been installed in my own system in 
+These udev rules seem to have been installed in my own system in
 
     /lib/udev/rules.d/39-usbmuxd.rules
 
