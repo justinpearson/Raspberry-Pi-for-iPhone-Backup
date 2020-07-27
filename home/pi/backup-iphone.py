@@ -8,24 +8,8 @@ blinkt.set_clear_on_exit(False)
 import os, time, subprocess
 from datetime import datetime
 
-###############################################
-
-# Probably needed since we built idevicepair & friends
-# from source in /home/pi/usr/ :
-
-import sys
-
-sys.path.append('/home/pi/usr/bin')
-
-# export SHELL = '/bin/bash'
-# export PATH = '/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin:/home/pi/usr/bin'
-# export LD_LIBRARY_PATH = '/home/pi/usr/lib'
-
-# Note: takes 10 sec upon plug-in for iOS to prompt for "Trust".
-
-MOUNT_DIR = '/home/pi/usr/mnt'
-BACKUP_DIR_BASE = '/home/pi/iphone-backups'
-LOCKFILE = '/home/pi/PHONE_BACKUP_IN_PROGRESS'
+MOUNT_DIR = '/home/pi/usr/mnt'               # Phone's filesystem appears here
+BACKUP_DIR_BASE = '/home/pi/iphone-backups'  # We backup the phone to here
 
 ##############################################
 
@@ -38,60 +22,26 @@ def main():
 
     leds = LEDs()
     leds.test()
-    t = 0 # which task are we on (0-7)
 
     print('Plugged in?')
-    leds.begin_task(t)
-    run_repeatedly(
-        plug_in,
-        is_plugged_in
-    )
-    leds.task_completed(t)
-    t += 1
+    leds.run_task_with_lights(task = lambda: run_repeatedly(plug_in, is_plugged_in), led = 0)
 
+    # Note: takes 10 sec upon plug-in for iOS to prompt for "Trust".
     print('Pairing...')
-    leds.begin_task(t)
-    run_repeatedly(
-        pair,
-        is_paired
-    )
-    leds.task_completed(t)
-    t += 1
-    
-    print('Mounting...')
-    leds.begin_task(t)
-    run_repeatedly(
-        mount,
-        is_mounted
-    )
-    leds.task_completed(t)
-    t += 1
-    
-    print('Backing up...')
-    leds.begin_task(t)
-    backup()
-    leds.task_completed(t)
-    t += 1
-    
-    print('Unmounting...')
-    leds.begin_task(t)
-    run_repeatedly(
-        unmount,
-        is_unmounted
-    )
-    leds.task_completed(t)
-    t += 1
-    
-    print('Unpairing...')
-    leds.begin_task(t)
-    run_repeatedly(
-        unpair,
-        is_unpaired
-    )
+    leds.run_task_with_lights(task = lambda: run_repeatedly(pair, is_paired), led = 1)
 
-    leds.task_completed(t)
-    t += 1
-    
+    print('Mounting...')
+    leds.run_task_with_lights(task = lambda: run_repeatedly(mount, is_mounted), led = 2)
+
+    print('Backing up...')
+    leds.run_task_with_lights(task = lambda: backup(), led = 3)
+
+    print('Unmounting...')
+    leds.run_task_with_lights(task = lambda: run_repeatedly(unmount, is_unmounted), led = 4)
+
+    print('Unpairing...')
+    leds.run_task_with_lights(task = lambda: run_repeatedly(unpair, is_unpaired), led = 5)
+
     print(f'{datetime.now()}: Bye from backup-iphone.sh!')
 
 
@@ -111,12 +61,10 @@ def run(arg_list):
 
     return p
 
-def run_repeatedly(f, check, imax=10, twait=2):
+def run_repeatedly(f, check, imax=100, twait=2):
     '''
-    Gonna run f()={f.__name__} 
-    until check()={check.__name__} returns true, 
-    up to imax={imax} times, 
-    pausing twait={twait} secs btwn each run.
+    Gonna run f() until check() returns true,
+    up to imax times, pausing twait secs after each failure.
     '''
 
     if check():
@@ -205,17 +153,14 @@ class LEDs:
     When a task completes, set to GREEN.
     If a task errors, set to RED.
     '''
-    def begin_task(self,i):
-        blinkt.set_pixel(i, 0, 0, 255, 0.07) 
-        blinkt.show() 
 
-    def task_completed(self,i):
-        blinkt.set_pixel(i, 0, 255, 0, 0.07) 
-        blinkt.show() 
+    def run_task_with_lights(self, task, led):
+        if led < 0 or led > 7:
+            raise RuntimeError(f'Blinkt LED strip has only 8 LEDs, so led={led} should be 0,1,...,7!')
 
-    def task_errored(self,i):
-        blinkt.set_pixel(i, 255, 0, 0, 0.07) 
-        blinkt.show() 
+        self._begin_task(led)
+        task()
+        self._task_completed(led)
 
     def all_off(self):
         blinkt.clear()
@@ -257,6 +202,18 @@ class LEDs:
             time.sleep(.05)
 
         self.all_off()
+
+    def _begin_task(self,i):
+        blinkt.set_pixel(i, 0, 0, 255, 0.07)
+        blinkt.show()
+
+    def _task_completed(self,i):
+        blinkt.set_pixel(i, 0, 255, 0, 0.07)
+        blinkt.show()
+
+    def _task_errored(self,i):
+        blinkt.set_pixel(i, 255, 0, 0, 0.07)
+        blinkt.show()
 
 
 if __name__ == '__main__':
