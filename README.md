@@ -365,12 +365,13 @@ There is some problem with `usbmuxd` and `udev` not initializing after a reboot:
 To get around this, add the line
 
     service udev restart
+    service usbmuxd restart
 
 to
 
     /etc/rc.local
 
-which causes `systemd` to restart `udev` after every change in runlevel. This is probably overkill, but it ensures `udev` is running correctly after a reboot. The alternative is sshing in and running `sudo service udev restart` after a reboot manually -- ugh.
+which causes `systemd` to restart `udev` and `usbmuxd` after every change in runlevel. This is probably overkill, but it ensures `udev` and `usbmuxd` are running correctly after a reboot. The alternative is sshing in and running `sudo service udev restart` (and also for `usbmuxd`) after a reboot manually -- ugh.
 
 
 
