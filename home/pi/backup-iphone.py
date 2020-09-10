@@ -93,7 +93,7 @@ def plug_in():
 
 def is_plugged_in():
     p = run(['/usr/bin/lsusb'])
-    return 'iPhone' in p.stdout
+    return 'iPad' in p.stdout or 'iPhone' in p.stdout
 
 def pair():
     print('Pairing...')
