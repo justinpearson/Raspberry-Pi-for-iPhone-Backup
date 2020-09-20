@@ -10,6 +10,7 @@ You can show backup progress with a [Blinkt LED strip](https://www.adafruit.com/
 
 <img src="Images/iphone-rpi-backup-blinkt-crop.png" width=270>
 
+**Note:** This project requires Python version 3.6 or later, because it uses f-strings for easy string formatting when printing messages.
 
 ## Table of Contents
 
