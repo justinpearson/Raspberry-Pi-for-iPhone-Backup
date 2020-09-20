@@ -1,5 +1,34 @@
 # run a short little program when iphone plugged in
-SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ENV{PRODUCT}=="5ac/12[9a][0-9a-f]/*", ACTION=="add", ENV{SYSTEMD_WANTS}="usbmuxd.service", RUN+="/bin/bash /home/pi/udev-runs-this.sh"
 
-# Same, for when its unplugged:
-SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ENV{PRODUCT}=="5ac/12[9a][0-9a-f]/*", ACTION=="remove", ENV{SYSTEMD_WANTS}="usbmuxd.service", RUN+="/usr/bin/python3 -c 'from blinkt import set_all, show, clear; from time import sleep; set_all(255,255,255) ; show() ;  sleep(1) ; clear() ; show()'"
+# old
+# SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ENV{PRODUCT}=="5ac/12[9a][0-9a-f]/*", ACTION=="add", ENV{SYSTEMD_WANTS}="usbmuxd.service", RUN+="/bin/bash /home/pi/udev-runs-this.sh"
+
+# new:
+SUBSYSTEM=="usb",				\
+ENV{DEVTYPE}=="usb_device",			\
+ENV{PRODUCT}=="5ac/12[9a][0-9a-f]/*", 		\
+ACTION=="add", 					\
+ENV{SYSTEMD_WANTS}="usbmuxd.service", 		\
+RUN+="/bin/bash /home/pi/udev-runs-this.sh"
+
+# RUN+='echo "/bin/su -c /home/pi/backup-iphone.py pi" | at now'
+
+
+# RUN+=echo "/bin/su -c $HOME/backup-iphone.py pi" | at now
+
+
+# RUN+="echo \"/bin/su -c 'python3 -u $HOME/backup-iphone.py >> $HOME/log.txt 2>&1' pi\" | at now"
+
+# echo "/bin/su -c '$HOME/backup-iphone.sh >> $HOME/log.txt 2>&1' pi" | at now
+
+# -u: stdout & stderr are unbuffered. Else our tail -f isn't real-time.
+# echo "python3 -u $HOME/backup-iphone.py >> $HOME/log.txt 2>&1"
+
+
+# Upon unplug:
+SUBSYSTEM=="usb",					\
+ENV{DEVTYPE}=="usb_device", 				\
+ENV{PRODUCT}=="5ac/12[9a][0-9a-f]/*", 			\
+ACTION=="remove", 					\
+ENV{SYSTEMD_WANTS}="usbmuxd.service", 			\
+RUN+="/bin/su -c /home/pi/run-upon-unplug-iphone.py pi"

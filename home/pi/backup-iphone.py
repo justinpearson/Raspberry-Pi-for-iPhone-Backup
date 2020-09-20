@@ -7,57 +7,78 @@ blinkt.set_clear_on_exit(False)
 
 import os, time, subprocess
 from datetime import datetime
+from pathlib import Path
 
-MOUNT_DIR = '/home/pi/usr/mnt'               # Phone's filesystem appears here
-BACKUP_DIR_BASE = '/home/pi/iphone-backups'  # We backup the phone to here
+MOUNT_DIR = Path.home() / 'usr' / 'mnt'           # I will mount iPhone's filesystem here
+BACKUP_DIR_BASE = Path.home() / 'iphone-backups'  # I will backup the phone to here
+LOG_FILE = Path('~/log.txt')
+
+# Follow the directions in the README for how to install these
+# binaries from source so that they live in your home directory.
+IFUSE_BIN = Path.home() / 'usr' / 'bin' / 'ifuse'
+IDEVICEPAIR_BIN = Path.home() / 'usr' / 'bin' / 'idevicepair'
+
+# The README describes how to install these 3 tools:
+LSUSB_BIN = '/usr/bin/lsusb'
+RSYNC_BIN = '/usr/bin/rsync'
+FUSERMOUNT_BIN = '/bin/fusermount'
+
+import logging
+logger = logging.getLogger('my_logger')
+logger.setLevel(logging.DEBUG)
+
+for h in [logging.StreamHandler(), logging.FileHandler(LOG_FILE, encoding='utf-8')]:
+    h.setLevel(logging.DEBUG)
+    h.setFormatter(logging.Formatter('%(asctime)-15s  %(name)-8s  %(levelname)-8s  %(message)s'))
+    logger.addHandler(h)
 
 ##############################################
 
 def main():
-    print(f'{datetime.now()}: Welcome to backup-iphone.sh!')
+    logger.info(f'{datetime.now()}: Welcome to backup-iphone.sh!')
 
-    if not os.path.isdir(BACKUP_DIR_BASE):
-        print(f'No backup dir exists, creating {BACKUP_DIR_BASE} ...')
-        os.mkdir(BACKUP_DIR_BASE)
+    if not BACKUP_DIR_BASE.is_dir():
+        logger.info(f'No backup dir exists, creating {BACKUP_DIR_BASE} ...')
+        BACKUP_DIR_BASE.mkdir()
 
     leds = LEDs()
     leds.test()
 
-    print('Plugged in?')
+    logger.info('Plugged in?')
     leds.run_task_with_lights(task = lambda: run_repeatedly(plug_in, is_plugged_in), led = 0)
 
     # Note: takes 10 sec upon plug-in for iOS to prompt for "Trust".
-    print('Pairing...')
+    logger.info('Pairing...')
     leds.run_task_with_lights(task = lambda: run_repeatedly(pair, is_paired), led = 1)
 
-    print('Mounting...')
+    logger.info('Mounting...')
     leds.run_task_with_lights(task = lambda: run_repeatedly(mount, is_mounted), led = 2)
 
-    print('Backing up...')
+    logger.info('Backing up...')
     leds.run_task_with_lights(task = lambda: backup(), led = 3)
 
-    print('Unmounting...')
+    logger.info('Unmounting...')
     leds.run_task_with_lights(task = lambda: run_repeatedly(unmount, is_unmounted), led = 4)
 
-    print('Unpairing...')
+    logger.info('Unpairing...')
     leds.run_task_with_lights(task = lambda: run_repeatedly(unpair, is_unpaired), led = 5)
 
-    print(f'{datetime.now()}: Bye from backup-iphone.sh!')
+    logger.info(f'{datetime.now()}: Bye from backup-iphone.sh!')
 
 
 #############################################
 
 def run(arg_list):
-    print('Running:')
-    print(arg_list)
+    logger.info('Running:')
+    logger.info(arg_list)
     p = subprocess.run(
         arg_list,
         capture_output=True,
         universal_newlines=True
         )
-    print(f'returncode: "{p.returncode}"')
-    print(f'stdout: "{p.stdout}"')
-    print(f'stderr: "{p.stderr}"')
+    logger.info(f'returncode: "{p.returncode}"')
+    logger.info(f'stdout: "{p.stdout}"')
+    logger.info(f'stderr: "{p.stderr}"')
 
     return p
 
@@ -68,68 +89,68 @@ def run_repeatedly(f, check, imax=100, twait=2):
     '''
 
     if check():
-        print(f'Check={check.__name__} succeeded without even running f={f.__name__} once!')
+        logger.info(f'Check={check.__name__} succeeded without even running f={f.__name__} once!')
         return
 
     i=0
     while i <= imax:
         i += 1
-        print(f'Running f={f.__name__}, attempt {i}/{imax}...')
+        logger.info(f'Running f={f.__name__}, attempt {i}/{imax}...')
         f()
-        print(f'Checking {check.__name__}...')
+        logger.info(f'Checking {check.__name__}...')
         if check():
-            print('Success!')
+            logger.info('Success!')
             return
         else:
             if i == imax:
                 raise RuntimeError(f'{f.__name__} failed {imax} times! Bailing.')
             else:
-                print(f'Failed. Sleeping for {twait} secs...')
+                logger.info(f'Failed. Sleeping for {twait} secs...')
                 time.sleep(twait)
     raise RuntimeError("Exceeded imax! Shouldn't get here!")
 
 def plug_in():
-    print('Please plug in your phone!')
+    logger.info('Please plug in your phone!')
 
 def is_plugged_in():
-    p = run(['/usr/bin/lsusb'])
+    p = run([LSUSB_BIN])
     return 'iPad' in p.stdout or 'iPhone' in p.stdout
 
 def pair():
-    print('Pairing...')
-    run(['/home/pi/usr/bin/idevicepair','pair'])
+    logger.info('Pairing...')
+    run([IDEVICEPAIR_BIN,'pair'])
 
 def is_paired():
     return len(paired_devices()) > 0
 
 def paired_devices():
-    p = run(['/home/pi/usr/bin/idevicepair','list'])
+    p = run([IDEVICEPAIR_BIN,'list'])
     devs = [d.strip() for d in p.stdout.split() if len(d.strip())>0]
     return devs
 
 def backup():
     sn = phone_serial_number()
-    print(f'Found phone serial number: {sn}')
+    logger.info(f'Found phone serial number: {sn}')
     backup_dir = os.path.join(BACKUP_DIR_BASE, sn)
     if not os.path.isdir(backup_dir):
-        print(f'No backup path exists, creating {backup_dir} ...')
+        logger.info(f'No backup path exists, creating {backup_dir} ...')
         os.mkdir(backup_dir)
-    run(['/usr/bin/rsync', '-v', '-a', MOUNT_DIR, backup_dir])
+    run([RSYNC_BIN, '-v', '-a', MOUNT_DIR, backup_dir])
 
 def mount():
-    run(['/home/pi/usr/bin/ifuse', MOUNT_DIR])
+    run([IFUSE_BIN, MOUNT_DIR])
 
 def is_mounted():
-    return any(MOUNT_DIR+' ' in m for m in open('/proc/mounts','r').readlines())
+    return any(f'{MOUNT_DIR} ' in m for m in open('/proc/mounts','r').readlines())
 
 def unmount():
-    run(['/bin/fusermount', '-u', MOUNT_DIR])
+    run([FUSERMOUNT_BIN, '-u', MOUNT_DIR])
 
 def is_unmounted():
     return not is_mounted()
 
 def unpair():
-    run(['/home/pi/usr/bin/idevicepair','unpair'])
+    run([IDEVICEPAIR_BIN,'unpair'])
 
 def is_unpaired():
     return not is_paired()
@@ -188,7 +209,7 @@ class LEDs:
                     r = 255
                     g = 255
                     b = 255
-                print(f'LED: {l}, color: {c}')
+                logger.info(f'LED: {l}, color: {c}')
                 blinkt.set_pixel(l, r, g, b, 0.07)
                 blinkt.show()
                 time.sleep(.01)
