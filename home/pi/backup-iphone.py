@@ -14,7 +14,7 @@ BACKUP_DIR_BASE = '/home/pi/iphone-backups'  # We backup the phone to here
 ##############################################
 
 def main():
-    print(f'{datetime.now()}: Welcome to backup-iphone.sh!')
+    print(f'{datetime.now()}: Welcome to backup-iphone.py!')
 
     if not os.path.isdir(BACKUP_DIR_BASE):
         print(f'No backup dir exists, creating {BACKUP_DIR_BASE} ...')
